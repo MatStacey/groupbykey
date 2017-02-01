@@ -1,9 +1,7 @@
 package main.app;
 
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -15,14 +13,8 @@ import java.util.Set;
 public class App {
     public static void main(String[] args) {
         FixProblem problem = new FixProblem("/table1.txt", "/table2.txt");
-
-        Set<String> keys = problem.getUniqueKeys();
-        Map<String, Integer> values = problem.getResults();
-
         if (!problem.hasError()) {
-            for (String key : keys) {
-                System.out.println(String.format("%s : %s", key, values.get(key)));
-            }
+            problem.writeTo("Merged-Table.txt");
         } else {
             System.out.println(problem.getMessage());
         }
@@ -30,9 +22,7 @@ public class App {
 
 
     private static class FixProblem {
-        String tableKey;
         String message;
-        String volume;
         boolean error = false;
 
         Set<String> uniqueKeys = new HashSet<String>();
@@ -41,54 +31,60 @@ public class App {
         private FixProblem(String file1, String file2) {
             InputStream tableOne = FixProblem.class.getResourceAsStream(file1);
             InputStream tableTwo = FixProblem.class.getResourceAsStream(file2);
-            if (tableOne == null) {
+            if (tableOne == null || tableTwo == null) {
                 this.setMessage("no file");
                 this.error = true;
                 return;
             }
+            this.readFiles(tableOne, tableTwo);
+        }
+
+        private void readFiles(InputStream tableOne, InputStream tableTwo) {
             try {
                 BufferedReader tableOneReader = new BufferedReader(new InputStreamReader(tableOne, "UTF-8"));
+                BufferedReader tableTwoReader = new BufferedReader(new InputStreamReader(tableTwo, "UTF-8"));
+                this.processFile(tableOneReader);
+                this.processFile(tableTwoReader);
+            } catch (Exception e) {
+                this.setMessage("Whoops");
+                this.error = true;
+            }
+        }
 
+        private void processFile(BufferedReader tableReader) {
+            try {
+                String strLine;
+                while ((strLine = tableReader.readLine()) != null) {
+                    int lastKeySeparator = strLine.lastIndexOf(" ");
+                    String tableKey = strLine.substring(0, lastKeySeparator);
+                    if(tableKey.contains(",")) {
+                        tableKey = tableKey.replace(",", "");
+                    }
+                    String volume = strLine.substring(lastKeySeparator, strLine.length());
 
-                int lastKeySeparator;
-                String tableOneStr;
-                while ((tableOneStr = tableOneReader.readLine()) != null) {
-                    lastKeySeparator = tableOneStr.lastIndexOf(" ");
-                    this.tableKey = tableOneStr.substring(0, lastKeySeparator);
-                    this.volume = tableOneStr.substring(lastKeySeparator, tableOneStr.length());
-
-                    this.uniqueKeys.add(this.tableKey);
-                    Integer currentVolume = this.resultMap.get(this.tableKey);
+                    this.uniqueKeys.add(tableKey);
+                    Integer currentVolume = this.resultMap.get(tableKey);
                     if (currentVolume == null) {
                         currentVolume = 0;
                     }
-                    this.resultMap.put(this.tableKey, currentVolume + Integer.parseInt(this.volume.trim()));
+                    this.resultMap.put(tableKey, currentVolume + Integer.parseInt(volume.trim()));
                 }
             } catch (Exception e) {
                 this.error = true;
                 this.setMessage("Whoops");
             }
+        }
 
+        private void writeTo(String outputFile) {
             try {
-                String tableTwoStr;
-                BufferedReader tableTwoReader = new BufferedReader(new InputStreamReader(tableTwo, "UTF-8"));
-                while ((tableTwoStr = tableTwoReader.readLine()) != null) {
-
-                    Integer lastKeySeparator2 = tableTwoStr.lastIndexOf(" ");
-                    this.tableKey = tableTwoStr.substring(0, lastKeySeparator2);
-                    this.volume = tableTwoStr.substring(lastKeySeparator2, tableTwoStr.length());
-
-
-                    this.uniqueKeys.add(this.tableKey);
-                    Integer currentVolume = this.resultMap.get(this.tableKey);
-                    if (currentVolume == null) {
-                        currentVolume = 0;
-                    }
-                    this.resultMap.put(this.tableKey, currentVolume + Integer.parseInt(this.volume.trim()));
+                PrintWriter writer = new PrintWriter(outputFile, "UTF-8");
+                for (String key : uniqueKeys) {
+                    writer.println(String.format("%s, %s", key, resultMap.get(key)));
                 }
-            } catch (Exception e) {
+                writer.close();
+            } catch (IOException e) {
+                this.setMessage("Can't Write");
                 this.error = true;
-                this.setMessage("Whoops 2");
             }
         }
 
